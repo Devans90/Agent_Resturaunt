@@ -11,7 +11,8 @@ class TickActionType(str, Enum):
 	NOOP = "noop"
 	READ_STOCK = "read_stock"
 	COOK = "cook"
-	BUY = "buy"
+	BUY_STOCK = "buy"
+	ADD_ORDER = "add_order"
 
 
 @dataclass(slots=True)
@@ -29,7 +30,7 @@ class TickAction:
 
 	action_type: TickActionType
 	actor: str
-	tick_cost: int
+	duration_ticks: int = 1
 	payload: dict[str, Any] = field(default_factory=dict)
 
 
