@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "agent-resturaunt"
 version = "0.1.0"
@@ -10,4 +14,10 @@ dependencies = [
     "pydantic-ai[temporal]>=2.33.0",
     "pydantic-ai-harness>=0.24.0",
     "pydantic-ai-slim[openai]>=2.33.0",
+    "inflect>=7.5.0",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["resturaunt*"]
+namespaces = true
