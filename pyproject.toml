@@ -1,0 +1,13 @@
+[project]
+name = "agent-resturaunt"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "ipykernel>=7.3.0",
+    "pydantic>=2.13.4",
+    "pydantic-ai[temporal]>=2.33.0",
+    "pydantic-ai-harness>=0.24.0",
+    "pydantic-ai-slim[openai]>=2.33.0",
+]

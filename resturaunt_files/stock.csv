@@ -1,0 +1,9 @@
+ingredient,qty,unit,reorder_threshold
+cash,50,DanBucks,0
+hotdog,0,each,5
+hd-bun,10,each,5
+burger,8,each,5
+b-bun,10,each,5
+mustard,20,servings,5
+ketchup,20,servings,5
+cheese,12,slices,5
