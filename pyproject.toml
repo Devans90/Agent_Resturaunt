@@ -15,6 +15,7 @@ dependencies = [
     "pydantic-ai-harness>=0.24.0",
     "pydantic-ai-slim[openai]>=2.33.0",
     "inflect>=7.5.0",
+    "pandas>=3.0.5",
 ]
 
 [tool.setuptools.packages.find]

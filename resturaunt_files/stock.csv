@@ -1,6 +1,6 @@
 ingredient,qty,unit,reorder_threshold
-cash,50,DanBucks,0
-hotdog,0,each,5
+cash,38.0,DanBucks,0
+hotdog,10.0,each,5
 hd-bun,10,each,5
 burger,8,each,5
 b-bun,10,each,5

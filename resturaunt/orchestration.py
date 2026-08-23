@@ -7,6 +7,7 @@ import csv
 import os
 import shutil
 from pathlib import Path
+import pandas as pd
 
 from resturaunt.agents.core import TickAction, TickActionType, TickAgent, TickContext
 from resturaunt.agents.customer import CustomerAgent
@@ -81,14 +82,99 @@ class RestaurantOrchestrator:
             return
 
         if action.action_type == TickActionType.BUY_STOCK:
-            # TODO: Implement the logic to buy stock. For now, just print the action.
-            print(f"tick={self.tick} buying stock: {action.payload}")
-            return
+            low_stock = action.payload.get("low_stock", [])
 
-        print(
-            f"tick={self.tick} action={action.action_type} actor={action.actor} "
-            f"duration={duration} payload={action.payload}"
-        )
+            if not low_stock:
+                print(f"tick={self.tick} no low stock items to buy.")
+                return
+
+            stock_items = ", ".join([f"{item['ingredient']} (qty: {item['qty']})" for item in low_stock])
+            print(f"tick={self.tick} buying stock for low stock items: {stock_items}")
+
+            stock_path = Path("resturaunt_files") / "stock.csv"
+            prices_path = Path("resturaunt_files") / "price_quantity_list.csv"
+
+            with stock_path.open("r", newline="", encoding="utf-8") as f:
+                stock_rows = list(csv.DictReader(f))
+
+            with prices_path.open("r", newline="", encoding="utf-8") as f:
+                price_rows = list(csv.DictReader(f))
+
+            price_map = {
+                    (row.get("sku") or "").strip().lower(): row
+                    for row in price_rows
+                    if (row.get("sku") or "").strip()
+                }
+
+            stock_map = {
+                (row.get("ingredient") or "").strip().lower(): row
+                for row in stock_rows
+                if (row.get("ingredient") or "").strip()
+            }
+
+            cash_row = next(
+                (
+                    row
+                    for row in stock_rows
+                    if (row.get("ingredient") or "").strip().lower() == "cash"
+                ),
+                None,
+            )
+
+            # INITIALISE CASH ROW IF NOT PRESENT
+            if cash_row is None:
+                cash_row = {"ingredient": "cash", "qty": "0", "unit": "DanBucks", "reorder_threshold": "0"}
+                stock_rows.append(cash_row)
+
+            # actual stock buying logic
+            for item in low_stock:
+                ingredient = str(item.get("ingredient", "")).strip()
+                if not ingredient:
+                    continue
+
+                key = ingredient.lower()
+                price_row = price_map.get(key)
+                if price_row is None:
+                    print(f"tick={self.tick} cannot buy stock for {ingredient}, not in price list.")
+                    continue
+
+                stock_row = stock_map.get(key)
+                if stock_row is None:
+                    stock_row = {
+                        "ingredient": ingredient,
+                        "qty": "0",
+                        "unit": item.get("unit", ""),
+                        "reorder_threshold": str(item.get("reorder_threshold", 0)),
+                    }
+                    stock_rows.append(stock_row)
+                    stock_map[key] = stock_row
+
+                pack_qty = float((price_row.get("pack_qty") or 0))
+                pack_price = float((price_row.get("pack_price") or 0))
+                current_qty = float((stock_row.get("qty") or 0))
+                current_cash = float((cash_row.get("qty") or 0))
+
+                if current_cash < pack_price:
+                    # just going to go into debt for now
+                    print("The debt cometh....")
+
+                # buy one pack to restock
+                stock_row["qty"] = str(current_qty + pack_qty)
+                cash_row["qty"] = str(current_cash - pack_price)
+                print(f"tick={self.tick} bought {pack_qty} {ingredient} for {pack_price} DanBucks")
+
+            with stock_path.open("w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=["ingredient", "qty", "unit", "reorder_threshold"])
+                writer.writeheader()
+                writer.writerows(stock_rows)
+
+            for agent in self.agents:
+                if isinstance(agent, StockerAgent):
+                    agent.need_stock = False
+                    agent.low_stock_snapshot = []
+            return
+            
+
 
 # iniitialise the loop
 tick = 0

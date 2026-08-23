@@ -136,7 +136,6 @@ class StockerAgent(TickAgent):
 							"tick": ctx.tick,
 							"need_stock": True,
 							"low_stock": self.low_stock_snapshot,
-							"status": "buy_not_implemented",
 						},
 					)
 				],
