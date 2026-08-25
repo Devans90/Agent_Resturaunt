@@ -16,9 +16,15 @@ dependencies = [
     "pydantic-ai-slim[openai]>=2.33.0",
     "inflect>=7.5.0",
     "pandas>=3.0.5",
+    "plotly>=6.9.0",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["resturaunt*"]
 namespaces = true
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
