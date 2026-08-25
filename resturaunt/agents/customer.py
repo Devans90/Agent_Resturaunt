@@ -11,7 +11,7 @@ class CustomerAgent(TickAgent):
         self.name = name
         self.order_chance = order_chance
 
-    def _random_order(self, order_id: int = 1) -> dict[str, str | int]:
+    def _random_order(self, order_id: int = 1, ctx: TickContext | None = None) -> dict[str, str | int]:
         """Generate a random order in the same shape as orders.csv rows."""
         # Read recipes and choose one menu item.
         with open("./resturaunt_files/recipe_lists.csv", newline="", encoding="utf-8") as csvfile:
@@ -36,7 +36,7 @@ class CustomerAgent(TickAgent):
                 "qty": 1,
                 "optional_toppings": ",".join([t for t in toppings if t]),
                 "created_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-                "created_at_tick": ctx.tick,
+                "created_at_tick": (ctx.tick if ctx is not None else order_id),
             }
 
             # print(f"[{self.name}] generated order: {order}")
@@ -48,7 +48,7 @@ class CustomerAgent(TickAgent):
         order_id = ctx.tick + 1
 
         if random.random() < self.order_chance:
-            order_payload = self._random_order(order_id)
+            order_payload = self._random_order(order_id, ctx)
             return TickResult(
                 actions=[
                     TickAction(

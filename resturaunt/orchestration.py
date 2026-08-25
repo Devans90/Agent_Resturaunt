@@ -7,11 +7,11 @@ import csv
 import os
 import shutil
 from pathlib import Path
-import pandas as pd
 
 from resturaunt.agents.core import TickAction, TickActionType, TickAgent, TickContext
 from resturaunt.agents.customer import CustomerAgent
 from resturaunt.agents.stocker import StockerAgent
+from resturaunt.visualisation import RestaurantDashboard, build_dashboard_snapshot
 
 # delete any existing resturaunt_files directory and copy the resturaunt_files_intialisation directory from the root of the project to the current working directory.
 if os.path.exists("resturaunt_files"):
@@ -19,13 +19,81 @@ if os.path.exists("resturaunt_files"):
 shutil.copytree("resturaunt_files_initialisation", "resturaunt_files")
 
 class RestaurantOrchestrator:
-    def __init__(self, agents: list[TickAgent]):
+    def __init__(self, agents: list[TickAgent], show_dashboard: bool = True):
         self.agents = agents
         self.tick = 0
         self.tick_cost = 1000  # minimum time cost for each tick in milliseconds
         self.agents = agents
         self.busy_until_tick: dict[str, int] = {}
         self.orders_csv_path = Path("resturaunt_files") / "orders.csv"
+        self.cash_history: list[float] = []
+        self.revenue_history: list[float] = []
+        self.profit_history: list[float] = []
+        self.dashboard = RestaurantDashboard(output_path="restaurant_dashboard.html", auto_open=show_dashboard) if show_dashboard else None
+        self._record_cash_tick()
+
+    def _read_stock_rows(self) -> list[dict[str, str]]:
+        stock_path = Path("resturaunt_files") / "stock.csv"
+        if not stock_path.exists():
+            return []
+        with stock_path.open("r", newline="", encoding="utf-8") as handle:
+            return list(csv.DictReader(handle))
+
+    def _read_orders_rows(self) -> list[dict[str, object]]:
+        if not self.orders_csv_path.exists():
+            return []
+        with self.orders_csv_path.open("r", newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        records: list[dict[str, object]] = []
+        for row in rows:
+            order_id = row.get("order_id")
+            created_tick_value = row.get("created_at_tick")
+            created_tick = None
+            if created_tick_value is not None and str(created_tick_value).strip():
+                try:
+                    created_tick = int(float(str(created_tick_value).strip()))
+                except ValueError:
+                    created_tick = None
+            if created_tick is None:
+                created_at = row.get("created_at")
+                if isinstance(created_at, str):
+                    try:
+                        created_tick = self.tick - int(created_at)
+                    except ValueError:
+                        created_tick = self.tick
+            if created_tick is None:
+                created_tick = self.tick
+            records.append({"order_id": order_id, "created_at_tick": int(created_tick)})
+        return records
+
+    def _record_cash_tick(self) -> None:
+        stock_rows = self._read_stock_rows()
+        cash_row = next(
+            (row for row in stock_rows if (row.get("ingredient") or "").strip().lower() == "cash"),
+            {"qty": "0"},
+        )
+        cash_value = float((cash_row.get("qty") or 0.0))
+        self.cash_history.append(cash_value)
+        if len(self.cash_history) > 1:
+            delta = self.cash_history[-1] - self.cash_history[-2]
+            self.revenue_history.append(max(0.0, delta))
+            self.profit_history.append(max(0.0, delta * 0.5))
+        else:
+            self.revenue_history.append(0.0)
+            self.profit_history.append(0.0)
+
+    def _update_dashboard(self) -> None:
+        if self.dashboard is None:
+            return
+        snapshot = build_dashboard_snapshot(
+            tick=self.tick,
+            cash_history=self.cash_history,
+            revenue_history=self.revenue_history,
+            profit_history=self.profit_history,
+            stock_rows=self._read_stock_rows(),
+            orders=self._read_orders_rows(),
+        )
+        self.dashboard.update(snapshot)
 
     def run(self, max_ticks: int = 1000):
         """Run the restaurant simulation for a given number of ticks."""
@@ -44,6 +112,8 @@ class RestaurantOrchestrator:
                         continue
                     self.execute_action(action)
 
+            self._record_cash_tick()
+            self._update_dashboard()
             self.tick += 1
 
     def _is_actor_busy(self, actor: str) -> bool:
@@ -51,7 +121,7 @@ class RestaurantOrchestrator:
 
     def _append_order(self, payload: dict[str, object]) -> None:
         """Append a new active order row to orders.csv."""
-        fieldnames = ["order_id", "status", "item", "qty", "optional_toppings", "created_at"]
+        fieldnames = ["order_id", "status", "item", "qty", "optional_toppings", "created_at", "created_at_tick"]
         order_row = {
             "order_id": payload.get("order_id", ""),
             "status": payload.get("status", "active"),
@@ -59,6 +129,7 @@ class RestaurantOrchestrator:
             "qty": payload.get("qty", 1),
             "optional_toppings": payload.get("optional_toppings", ""),
             "created_at": payload.get("created_at", ""),
+            "created_at_tick": payload.get("created_at_tick", self.tick),
         }
 
         file_exists = self.orders_csv_path.exists()
