@@ -36,6 +36,7 @@ class CustomerAgent(TickAgent):
                 "qty": 1,
                 "optional_toppings": ",".join([t for t in toppings if t]),
                 "created_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+                "created_at_tick": ctx.tick,
             }
 
             # print(f"[{self.name}] generated order: {order}")
