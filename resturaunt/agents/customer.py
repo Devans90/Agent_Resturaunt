@@ -10,6 +10,7 @@ class CustomerAgent(TickAgent):
     def __init__(self, name: str = "rando customer", order_chance: float = 0.01) -> None:
         self.name = name
         self.order_chance = order_chance
+        self.order_age = 0
 
     def _random_order(self, order_id: int = 1, ctx: TickContext | None = None) -> dict[str, str | int]:
         """Generate a random order in the same shape as orders.csv rows."""
@@ -29,12 +30,14 @@ class CustomerAgent(TickAgent):
                 if random.random() < 0.5:  # 50% chance to include each topping
                     toppings.append(item.strip())
 
+            image_name = (base_choice.get("image") or "hotdog.png").strip()
             order = {
                 "order_id": order_id,
                 "status": "active",
                 "item": (base_choice.get("menu_item") or "").strip(),
                 "qty": 1,
                 "optional_toppings": ",".join([t for t in toppings if t]),
+                "image": image_name,
                 "created_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
                 "created_at_tick": (ctx.tick if ctx is not None else order_id),
             }

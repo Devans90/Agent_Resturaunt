@@ -38,11 +38,15 @@ def _normalise_order(order: dict[str, Any], tick: int) -> dict[str, Any]:
         created_tick = tick
 
     age_ticks = max(0, tick - created_tick)
+    item_name = str(order.get("item") or "hotdog").strip() or "hotdog"
+    image_name = str(order.get("image") or "").strip() or f"{item_name.lower().replace(' ', '')}.png"
     return {
         "order_id": order.get("order_id", f"order-{created_tick}"),
         "created_at_tick": created_tick,
         "age_ticks": age_ticks,
         "priority": age_ticks + 1,
+        "item": item_name,
+        "image": f"./media/{image_name}",
     }
 
 
@@ -108,13 +112,16 @@ def _render_cash_figure(snapshot: dict[str, Any]) -> go.Figure:
     fig.update_layout(
         title="Cash, revenue and profit",
         template="plotly_dark",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        paper_bgcolor="#0f172a",
+        plot_bgcolor="#0f172a",
+        font=dict(color="#E2E8F0"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, font=dict(color="#E2E8F0")),
         margin=dict(l=30, r=30, t=50, b=30),
         height=300,
     )
-    fig.update_xaxes(title_text="tick")
-    fig.update_yaxes(title_text="cash", secondary_y=False)
-    fig.update_yaxes(title_text="cash flow", secondary_y=True)
+    fig.update_xaxes(title_text="tick", title_font=dict(color="#E2E8F0"), tickfont=dict(color="#E2E8F0"), gridcolor="#1f2937", zerolinecolor="#334155")
+    fig.update_yaxes(title_text="cash", title_font=dict(color="#E2E8F0"), tickfont=dict(color="#E2E8F0"), gridcolor="#1f2937", zerolinecolor="#334155", secondary_y=False)
+    fig.update_yaxes(title_text="cash flow", title_font=dict(color="#E2E8F0"), tickfont=dict(color="#E2E8F0"), gridcolor="#1f2937", zerolinecolor="#334155", secondary_y=True)
     return fig
 
 
@@ -136,12 +143,15 @@ def _render_stock_figure(snapshot: dict[str, Any]) -> go.Figure:
     fig.update_layout(
         title="Stock vs target",
         template="plotly_dark",
+        paper_bgcolor="#0f172a",
+        plot_bgcolor="#0f172a",
+        font=dict(color="#E2E8F0"),
         barmode="group",
         height=300,
         margin=dict(l=20, r=20, t=50, b=80),
     )
-    fig.update_yaxes(title_text="qty")
-    fig.update_xaxes(title_text="ingredient")
+    fig.update_yaxes(title_text="qty", title_font=dict(color="#E2E8F0"), tickfont=dict(color="#E2E8F0"), gridcolor="#1f2937", zerolinecolor="#334155")
+    fig.update_xaxes(title_text="ingredient", title_font=dict(color="#E2E8F0"), tickfont=dict(color="#E2E8F0"), gridcolor="#1f2937", zerolinecolor="#334155")
     return fig
 
 
@@ -153,39 +163,65 @@ def _render_waiting_orders_figure(snapshot: dict[str, Any]) -> go.Figure:
         fig.update_layout(template="plotly_dark", height=300, margin=dict(l=20, r=20, t=40, b=20))
         return fig
 
-    ages = [item["age_ticks"] for item in waiting]
-    labels = [str(item["order_id"]) for item in waiting]
-    max_age = max(ages) if ages else 1
-    colors = [item["age_ticks"] for item in waiting]
-
     fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=labels,
-            y=[1] * len(labels),
-            mode="markers",
-            marker=dict(
-                size=[max(12, age * 4 + 10) for age in ages],
-                color=colors,
-                colorscale=[[0, "#2ECC71"], [0.5, "#F1C40F"], [1, "#E74C3C"]],
-                cmin=0,
-                cmax=max_age,
-                showscale=True,
-                colorbar=dict(title="wait\n(ticks)"),
-                opacity=0.8,
-            ),
-            text=[f"age: {age} ticks" for age in ages],
-            hovertemplate="order %{x}<br>age: %{text}<extra></extra>",
-            showlegend=False,
+    y_positions = list(range(len(waiting), 0, -1))
+
+    for idx, item in enumerate(waiting):
+        age = int(item["age_ticks"])
+        color = "#22c55e" if age <= 2 else "#f59e0b" if age <= 5 else "#ef4444"
+        y = y_positions[idx]
+        image_path = item.get("image") or "./media/hotdog.png"
+
+        fig.add_shape(
+            type="rect",
+            xref="x",
+            yref="y",
+            x0=-0.8,
+            x1=0.8,
+            y0=y - 0.45,
+            y1=y + 0.45,
+            line=dict(color=color, width=4),
+            fillcolor="rgba(0,0,0,0)",
+            layer="below",
         )
-    )
+        fig.add_layout_image(
+            dict(
+                source=image_path,
+                xref="x",
+                yref="y",
+                x=0,
+                y=y,
+                sizex=0.75,
+                sizey=0.75,
+                xanchor="center",
+                yanchor="middle",
+                sizing="contain",
+                opacity=1,
+                layer="above",
+            )
+        )
+        fig.add_annotation(
+            text=f"{age} ticks",
+            x=0,
+            y=y + 0.55,
+            xref="x",
+            yref="y",
+            showarrow=False,
+            font=dict(color="#F8FAFC", size=11),
+            xanchor="center",
+            yanchor="bottom",
+        )
+
     fig.update_layout(
         title="Waiting orders",
         template="plotly_dark",
+        paper_bgcolor="#0f172a",
+        plot_bgcolor="#0f172a",
+        font=dict(color="#E2E8F0"),
         height=300,
-        margin=dict(l=20, r=20, t=50, b=80),
-        xaxis=dict(title="order"),
-        yaxis=dict(showticklabels=False, title="queue"),
+        margin=dict(l=20, r=20, t=50, b=20),
+        xaxis=dict(visible=False, range=[-1, 1], showgrid=False, zeroline=False, showline=False),
+        yaxis=dict(visible=False, range=[0, len(waiting) + 1], showgrid=False, zeroline=False, showline=False),
     )
     return fig
 
@@ -197,7 +233,15 @@ def _render_kitchen_tasks_figure(snapshot: dict[str, Any]) -> go.Figure:
             cells=dict(values=[["None yet"], ["not implemented"]], fill_color="#111827", line_color="#374151", font=dict(color="#E5E7EB")),
         )]
     )
-    fig.update_layout(title="Active kitchen tasks", template="plotly_dark", height=300, margin=dict(l=20, r=20, t=50, b=20))
+    fig.update_layout(
+        title="Active kitchen tasks",
+        template="plotly_dark",
+        paper_bgcolor="#0f172a",
+        plot_bgcolor="#0f172a",
+        font=dict(color="#E2E8F0"),
+        height=300,
+        margin=dict(l=20, r=20, t=50, b=20),
+    )
     return fig
 
 
@@ -299,12 +343,15 @@ def render_dashboard_html(snapshot: dict[str, Any]) -> str:
               layout: {{
                 title: 'Cash, revenue and profit',
                 template: 'plotly_dark',
+                paper_bgcolor: '#0f172a',
+                plot_bgcolor: '#0f172a',
+                font: {{ color: '#E2E8F0' }},
                 height: 300,
                 margin: {{ l: 30, r: 30, t: 50, b: 30 }},
-                xaxis: {{ title: 'tick' }},
-                yaxis: {{ title: 'cash' }},
-                yaxis2: {{ title: 'cash flow', overlaying: 'y', side: 'right' }},
-                legend: {{ orientation: 'h', yanchor: 'bottom', y: 1.02, xanchor: 'left', x: 0 }}
+                xaxis: {{ title: 'tick', gridcolor: '#1f2937', tickfont: {{ color: '#E2E8F0' }}, titlefont: {{ color: '#E2E8F0' }} }},
+                yaxis: {{ title: 'cash', gridcolor: '#1f2937', tickfont: {{ color: '#E2E8F0' }}, titlefont: {{ color: '#E2E8F0' }} }},
+                yaxis2: {{ title: 'cash flow', overlaying: 'y', side: 'right', gridcolor: '#1f2937', tickfont: {{ color: '#E2E8F0' }}, titlefont: {{ color: '#E2E8F0' }} }},
+                legend: {{ orientation: 'h', yanchor: 'bottom', y: 1.02, xanchor: 'left', x: 0, font: {{ color: '#E2E8F0' }} }}
               }}
             }};
           }}
@@ -320,11 +367,14 @@ def render_dashboard_html(snapshot: dict[str, Any]) -> str:
               layout: {{
                 title: 'Stock vs target',
                 template: 'plotly_dark',
+                paper_bgcolor: '#0f172a',
+                plot_bgcolor: '#0f172a',
+                font: {{ color: '#E2E8F0' }},
                 barmode: 'group',
                 height: 300,
                 margin: {{ l: 20, r: 20, t: 50, b: 80 }},
-                xaxis: {{ title: 'ingredient' }},
-                yaxis: {{ title: 'qty' }}
+                xaxis: {{ title: 'ingredient', gridcolor: '#1f2937', tickfont: {{ color: '#E2E8F0' }}, titlefont: {{ color: '#E2E8F0' }} }},
+                yaxis: {{ title: 'qty', gridcolor: '#1f2937', tickfont: {{ color: '#E2E8F0' }}, titlefont: {{ color: '#E2E8F0' }} }}
               }}
             }};
           }}
@@ -334,35 +384,63 @@ def render_dashboard_html(snapshot: dict[str, Any]) -> str:
             if (!items.length) {{
               return {{ data: [{{ type: 'scatter', x: [], y: [], mode: 'markers' }}], layout: {{ title: 'Waiting orders', template: 'plotly_dark', height: 300, margin: {{ l: 20, r: 20, t: 50, b: 80 }} }} }};
             }}
-            const ages = items.map(item => item.age_ticks);
-            const maxAge = Math.max(...ages, 1);
+            const imageMap = {{
+              hotdog: './media/hotdog.png',
+              burger: './media/burger.png'
+            }};
+            const yPositions = items.map((_, index) => items.length - index);
+            const images = items.map((item, index) => ({{
+              source: (item.image || imageMap[(item.item || 'hotdog').toLowerCase().replace(/\s+/g, '')] || './media/hotdog.png'),
+              xref: 'x',
+              yref: 'y',
+              x: 0,
+              y: yPositions[index],
+              sizex: 0.75,
+              sizey: 0.75,
+              xanchor: 'center',
+              yanchor: 'middle',
+              sizing: 'contain',
+              opacity: 1,
+              layer: 'above'
+            }}));
+            const shapes = items.map((item, index) => ({{
+              type: 'rect',
+              xref: 'x',
+              yref: 'y',
+              x0: -0.8,
+              x1: 0.8,
+              y0: yPositions[index] - 0.45,
+              y1: yPositions[index] + 0.45,
+              line: {{ color: item.age_ticks <= 2 ? '#22c55e' : item.age_ticks <= 5 ? '#f59e0b' : '#ef4444', width: 4 }},
+              fillcolor: 'rgba(255,255,255,0)',
+              layer: 'below'
+            }}));
+            const annotations = items.map((item, index) => ({{
+              x: 0,
+              y: yPositions[index] + 0.55,
+              xref: 'x',
+              yref: 'y',
+              text: item.age_ticks + ' ticks',
+              showarrow: false,
+              font: {{ color: '#F8FAFC', size: 11 }},
+              xanchor: 'center',
+              yanchor: 'bottom'
+            }}));
             return {{
-              data: [{{
-                type: 'scatter',
-                x: items.map(item => String(item.order_id)),
-                y: items.map(() => 1),
-                mode: 'markers',
-                marker: {{
-                  size: items.map(item => Math.max(12, item.age_ticks * 4 + 10)),
-                  color: ages,
-                  colorscale: [[0, '#2ECC71'], [0.5, '#F1C40F'], [1, '#E74C3C']],
-                  cmin: 0,
-                  cmax: maxAge,
-                  showscale: true,
-                  colorbar: {{ title: 'wait<br>(ticks)' }},
-                  opacity: 0.8
-                }},
-                text: items.map(item => 'age: ' + item.age_ticks + ' ticks'),
-                hovertemplate: 'order %{{x}}<br>age: %{{text}}<extra></extra>',
-                showlegend: false
-              }}],
+              data: [{{ type: 'scatter', x: [0], y: [0], mode: 'markers', hoverinfo: 'skip', marker: {{ size: 0, opacity: 0 }}, showlegend: false }}],
               layout: {{
                 title: 'Waiting orders',
                 template: 'plotly_dark',
+                paper_bgcolor: '#0f172a',
+                plot_bgcolor: '#0f172a',
+                font: {{ color: '#E2E8F0' }},
                 height: 300,
-                margin: {{ l: 20, r: 20, t: 50, b: 80 }},
-                xaxis: {{ title: 'order' }},
-                yaxis: {{ showticklabels: false, title: 'queue' }}
+                margin: {{ l: 20, r: 20, t: 50, b: 20 }},
+                xaxis: {{ visible: false, range: [-1, 1], showgrid: false, zeroline: false, showline: false }},
+                yaxis: {{ visible: false, range: [0, items.length + 1], showgrid: false, zeroline: false, showline: false }},
+                images: images,
+                annotations: annotations,
+                shapes: shapes
               }}
             }};
           }}
@@ -374,7 +452,7 @@ def render_dashboard_html(snapshot: dict[str, Any]) -> str:
                 header: {{ values: ['Kitchen tasks', 'Status'], fill: {{ color: '#1f2937' }}, line: {{ color: '#374151' }}, font: {{ color: 'white' }} }},
                 cells: {{ values: [['None yet'], ['not implemented']], fill: {{ color: '#111827' }}, line: {{ color: '#374151' }}, font: {{ color: '#E5E7EB' }} }}
               }}],
-              layout: {{ title: 'Active kitchen tasks', template: 'plotly_dark', height: 300, margin: {{ l: 20, r: 20, t: 50, b: 20 }} }}
+              layout: {{ title: 'Active kitchen tasks', template: 'plotly_dark', paper_bgcolor: '#0f172a', plot_bgcolor: '#0f172a', font: {{ color: '#E2E8F0' }}, height: 300, margin: {{ l: 20, r: 20, t: 50, b: 20 }} }}
             }};
           }}
 

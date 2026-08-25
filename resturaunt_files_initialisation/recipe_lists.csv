@@ -1,3 +1,3 @@
-menu_item,base_ingredients,valid_optional_toppings,price
-hotdog,"[hd-bun,hotdog]","[mustard,ketchup]",4.50
-burger,"[b-bun,burger]","[cheese,mustard,ketchup]",6.00
+menu_item,base_ingredients,valid_optional_toppings,price,image
+hotdog,"[hd-bun,hotdog]","[mustard,ketchup]",4.50,hotdog.png
+burger,"[b-bun,burger]","[cheese,mustard,ketchup]",6.00,burger.png

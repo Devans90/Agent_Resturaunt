@@ -6,6 +6,7 @@
 import csv
 import os
 import shutil
+from datetime import UTC, datetime
 from pathlib import Path
 
 from resturaunt.agents.core import TickAction, TickActionType, TickAgent, TickContext
@@ -47,6 +48,16 @@ class RestaurantOrchestrator:
         records: list[dict[str, object]] = []
         for row in rows:
             order_id = row.get("order_id")
+            item_name = (row.get("item") or "").strip()
+            image_name = (row.get("image") or "").strip()
+            if not image_name and item_name:
+                recipe_path = Path("resturaunt_files") / "recipe_lists.csv"
+                if recipe_path.exists():
+                    with recipe_path.open("r", newline="", encoding="utf-8") as recipe_handle:
+                        for recipe_row in csv.DictReader(recipe_handle):
+                            if (recipe_row.get("menu_item") or "").strip().lower() == item_name.lower():
+                                image_name = (recipe_row.get("image") or "").strip()
+                                break
             created_tick_value = row.get("created_at_tick")
             created_tick = None
             if created_tick_value is not None and str(created_tick_value).strip():
@@ -57,13 +68,21 @@ class RestaurantOrchestrator:
             if created_tick is None:
                 created_at = row.get("created_at")
                 if isinstance(created_at, str):
+                    created_at = created_at.strip()
+                    if created_at.endswith("Z"):
+                        created_at = created_at[:-1] + "+00:00"
                     try:
-                        created_tick = self.tick - int(created_at)
+                        created_at_dt = datetime.fromisoformat(created_at)
+                        if created_at_dt.tzinfo is None:
+                            created_at_dt = created_at_dt.replace(tzinfo=UTC)
+                        age_seconds = max(0, int((datetime.now(UTC) - created_at_dt).total_seconds()))
+                        created_tick = max(0, self.tick - age_seconds)
                     except ValueError:
-                        created_tick = self.tick
+                        created_tick = 0
             if created_tick is None:
-                created_tick = self.tick
-            records.append({"order_id": order_id, "created_at_tick": int(created_tick)})
+                created_tick = 0
+            record = {"order_id": order_id, "created_at_tick": int(created_tick), "item": item_name, "image": image_name}
+            records.append(record)
         return records
 
     def _record_cash_tick(self) -> None:
@@ -121,13 +140,25 @@ class RestaurantOrchestrator:
 
     def _append_order(self, payload: dict[str, object]) -> None:
         """Append a new active order row to orders.csv."""
-        fieldnames = ["order_id", "status", "item", "qty", "optional_toppings", "created_at", "created_at_tick"]
+        fieldnames = ["order_id", "status", "item", "qty", "optional_toppings", "image", "created_at", "created_at_tick"]
+        image_name = str(payload.get("image") or "").strip()
+        if not image_name:
+            item_name = str(payload.get("item") or "").strip()
+            if item_name:
+                recipe_path = Path("resturaunt_files") / "recipe_lists.csv"
+                if recipe_path.exists():
+                    with recipe_path.open("r", newline="", encoding="utf-8") as recipe_handle:
+                        for recipe_row in csv.DictReader(recipe_handle):
+                            if (recipe_row.get("menu_item") or "").strip().lower() == item_name.lower():
+                                image_name = (recipe_row.get("image") or "").strip()
+                                break
         order_row = {
             "order_id": payload.get("order_id", ""),
             "status": payload.get("status", "active"),
             "item": payload.get("item", ""),
             "qty": payload.get("qty", 1),
             "optional_toppings": payload.get("optional_toppings", ""),
+            "image": image_name,
             "created_at": payload.get("created_at", ""),
             "created_at_tick": payload.get("created_at_tick", self.tick),
         }
